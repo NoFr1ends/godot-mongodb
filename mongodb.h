@@ -5,7 +5,6 @@
 #include "core/hash_map.h"
 #include "core/io/stream_peer_tcp.h"
 
-#include "json.hpp"
 #include "query_result.h"
 
 class MongoDatabase;
@@ -15,6 +14,7 @@ class MongoDB : public Reference {
 
 public:
     void execute_query(String collection_name, int skip, int results, Dictionary &query, Ref<QueryResult> result);
+    void free_cursor(int64_t cursor_id);
 
 protected:
     static void _bind_methods();
@@ -23,7 +23,6 @@ protected:
     Ref<MongoDatabase> get_database(String name);
 
     void poll();
-    void test();
 
 private:
     Ref<StreamPeerTCP> m_tcp;

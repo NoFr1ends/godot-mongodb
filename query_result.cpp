@@ -11,7 +11,10 @@ QueryResult::QueryResult(Ref<MongoDB> db) : m_db(db) {
 }
 
 QueryResult::~QueryResult() {
-    print_line("Would delete cursor " + itos(m_cursor_id));
+    if(m_cursor_id != 0 && m_db.is_valid()) {
+        print_verbose("Free mongodb cursor " + itos(m_cursor_id));
+        m_db->free_cursor(m_cursor_id);
+    }
 }
 
 void QueryResult::_bind_methods() {

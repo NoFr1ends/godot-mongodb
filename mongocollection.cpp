@@ -3,8 +3,6 @@
 #include "mongodatabase.h"
 #include "query_result.h"
 
-#include "json.hpp"
-
 MongoCollection::MongoCollection() {}
 
 void MongoCollection::create(Ref<MongoDatabase> database, String collection) {
@@ -38,18 +36,18 @@ Variant MongoCollection::insert_one(Dictionary document) {
 }
 
 Variant MongoCollection::find_one(Dictionary filter) {
-    /*try {
-        auto result = m_collection.find_one(convert_dictionary_to_document(filter));
-        if(result) {
-            return convert_document_to_dictionary((*result).view());
-        } else {
-            return Variant();
-        }
-    } catch(mongocxx::exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
-    return Variant();
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db));
+    result->set_single_result(true);
+
+    m_database->m_db->execute_query(
+        full_collection_name(),
+        0,
+        -1, /* close cursor automatically */
+        filter,
+        result
+    );
+
+    return result;
 }
 
 Variant MongoCollection::find(Dictionary filter) {
@@ -63,17 +61,6 @@ Variant MongoCollection::find(Dictionary filter) {
         result
     );
 
-    /*try {
-        auto cursor = m_collection.find(convert_dictionary_to_document(filter));
-        Array array;
-        for(auto doc: cursor) {
-            array.append(convert_document_to_dictionary(doc));
-        }
-        return array;
-    } catch(mongocxx::exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
     return result;
 }
 

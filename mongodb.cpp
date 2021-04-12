@@ -1,17 +1,11 @@
 #include "mongodb.h"
 
-//#include <mongocxx/instance.hpp>
-//#include <mongocxx/uri.hpp>
-
 #include "modules/regex/regex.h"
 #include "core/io/marshalls.h"
 
-#include "json.hpp"
 #include "mongodatabase.h"
 #include "query_result.h"
 #include "bson.h"
-
-//mongocxx::instance instance{};
 
 MongoDB::MongoDB() {
 
@@ -116,18 +110,28 @@ void MongoDB::poll() {
         auto result = m_pending[response_to];
         result->set_cursor_id(cursor_id);
 
-        // TODO: in case of "find_one" etc we should assign the dictionary directly to the result
+        auto single_result = result->get_single_result();
 
-        Array documents;
         int position = 0;
 
-        for(int i = 0; i < returned; i++) {
-            Dictionary document;
-            position = Bson::deserialize(&m_packet, document, position);
-            documents.append(document);
+        if(!single_result) {
+            Array documents;
+            for(int i = 0; i < returned; i++) {
+                Dictionary document;
+                position = Bson::deserialize(&m_packet, document, position);
+                documents.append(document);
+            }
+            result->assign_result(documents);
+        } else {
+            if(returned > 0) {
+                Dictionary document;
+                Bson::deserialize(&m_packet, document, position);
+                result->assign_result(document);
+            } else {
+                result->assign_result(Variant()); // set result to null
+            }
         }
-
-        result->assign_result(documents);
+        
         result->emit_signal("completed");
         m_pending.erase(response_to);
     }
@@ -191,69 +195,49 @@ void MongoDB::execute_query(String collection_name, int skip, int results, Dicti
     m_tcp->put_data(m_packet.ptr(), position);
 }
 
-void MongoDB::test() {
-/*
-    int position = 0;
+void MongoDB::free_cursor(int64_t cursor_id) {
+    int position = 4;
 
-    MAKE_ROOM(16)
+    auto request_id = m_request_id++;
 
-    // length
-    //encode_uint32(16, &m_packet.write[position]);
+    // Request ID
+    MAKE_ROOM(position + 4);
+    encode_uint32(request_id, &m_packet.write[position]);
     position += 4;
-    
-    // request id
+
+    // Response ID
+    MAKE_ROOM(position + 4);
+    encode_uint32(0, &m_packet.write[position]);
+    position += 4;
+
+    // OPCode
+    MAKE_ROOM(position + 4);
+    encode_uint32(2007, &m_packet.write[position]);
+    position += 4;
+
+    // always zero
+    MAKE_ROOM(position + 4);
+    encode_uint32(0, &m_packet.write[position]);
+    position += 4;
+
+    // number of cursors to free
+    MAKE_ROOM(position + 4);
     encode_uint32(1, &m_packet.write[position]);
     position += 4;
 
-    // response id
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
+    // cursor to remove
+    MAKE_ROOM(position + 8);
+    encode_uint64(cursor_id, &m_packet.write[position]);
+    position += 8;
 
-    // opcode
-    encode_uint32(2004, &m_packet.write[position]);
-    position += 4;
-
-    // OPCODE: Query
-
-    // flags
-    MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
-
-    // full collection name
-    String name = "accounts.accounts";
-    CharString name_data = name.utf8();
-    auto length = encode_cstring(name_data.get_data(), nullptr);
-    MAKE_ROOM(position + length)
-    encode_cstring(name_data.get_data(), &m_packet.write[position]);
-    position += length;
-
-    // number to skip    
-    MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
-
-    // number to return
-    MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
-
-    // query (bson)
-    auto query = nlohmann::json::object();
-    auto data = nlohmann::json::to_bson(query);
-    MAKE_ROOM(position + data.size());
-    copymem(&m_packet.write[position], &data[0], data.size());
-    position += data.size();
-
-    // write length to the start
+    // length
     encode_uint32(position, &m_packet.write[0]);
 
-    m_tcp->put_data(m_packet.ptr(), position);*/
+    m_tcp->put_data(m_packet.ptr(), position);
 }
 
 void MongoDB::_bind_methods() {
     ClassDB::bind_method(D_METHOD("poll"), &MongoDB::poll);
     ClassDB::bind_method(D_METHOD("connect_database", "connection_uri"), &MongoDB::connect_database);
     ClassDB::bind_method(D_METHOD("get_database", "name"), &MongoDB::get_database);
-    ClassDB::bind_method(D_METHOD("test"), &MongoDB::test);
 }
