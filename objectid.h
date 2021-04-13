@@ -7,12 +7,15 @@ class MongoObjectID: public Reference {
     GDCLASS(MongoObjectID, Reference);
 
 public:
-    MongoObjectID(PoolByteArray &data);
+    MongoObjectID();
+    ~MongoObjectID();
 
     static void _bind_methods();
+
+    uint8_t *get_data() { return m_data; }
 
     String to_string() override;
     
 private:
-    PoolByteArray m_data;
+    uint8_t *m_data;
 };

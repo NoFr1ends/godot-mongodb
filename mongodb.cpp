@@ -177,7 +177,7 @@ void MongoDB::execute_query(String collection_name, int skip, int results, Dicti
 
     // Number to return
     MAKE_ROOM(position + 4);
-    encode_uint32(results, &m_packet.write[position]);
+    encode_uint32(0, &m_packet.write[position]);
     position += 4;
 
     // Query
@@ -192,6 +192,58 @@ void MongoDB::execute_query(String collection_name, int skip, int results, Dicti
     m_pending.set({ request_id, result });
 
     // Send query to server
+    m_tcp->put_data(m_packet.ptr(), position);
+}
+
+void MongoDB::get_more(Ref<QueryResult> result) {
+    int position = 4;
+
+    auto request_id = m_request_id++;
+
+    // Request ID
+    MAKE_ROOM(position + 4);
+    encode_uint32(request_id, &m_packet.write[position]);
+    position += 4;
+
+    // Response ID
+    MAKE_ROOM(position + 4);
+    encode_uint32(0, &m_packet.write[position]);
+    position += 4;
+
+    // OPCode
+    MAKE_ROOM(position + 4);
+    encode_uint32(2005, &m_packet.write[position]);
+    position += 4;
+
+    // always zero
+    MAKE_ROOM(position + 4);
+    encode_uint32(0, &m_packet.write[position]);
+    position += 4;
+
+    // Collection Name
+    CharString collection = result->get_collection_name().utf8();
+    auto length = encode_cstring(collection.get_data(), nullptr);
+    MAKE_ROOM(position + length);
+    encode_cstring(collection.get_data(), &m_packet.write[position]);
+    position += length;
+
+    // number to return (0 = server default)
+    MAKE_ROOM(position + 4);
+    encode_uint32(0, &m_packet.write[position]);
+    position += 4;
+
+    // Cursor ID
+    MAKE_ROOM(position + 8);
+    encode_uint64(result->get_cursor_id(), &m_packet.write[position]);
+    position += 8;
+
+    // length
+    encode_uint32(position, &m_packet.write[0]);
+
+    result->set_request_id(request_id);
+
+    m_pending.set({ request_id, result });
+
     m_tcp->put_data(m_packet.ptr(), position);
 }
 

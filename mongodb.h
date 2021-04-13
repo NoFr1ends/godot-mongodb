@@ -14,6 +14,7 @@ class MongoDB : public Reference {
 
 public:
     void execute_query(String collection_name, int skip, int results, Dictionary &query, Ref<QueryResult> result);
+    void get_more(Ref<QueryResult> result);
     void free_cursor(int64_t cursor_id);
 
 protected:

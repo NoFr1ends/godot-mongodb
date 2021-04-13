@@ -254,13 +254,11 @@ Variant deserialize_value(uint8_t type, Vector<uint8_t> *data, int *position) {
         }
         case 0x07: // object id
         {
-            PoolByteArray objectid_data;
-            objectid_data.resize(12);
-            auto writer = objectid_data.write();
-            copymem(writer.ptr(), data->ptr() + *position, 12);
+            Ref<MongoObjectID> objectid = memnew(MongoObjectID());
+
+            copymem(objectid->get_data(), data->ptr() + *position, 12);
             *position += 12;
 
-            Ref<MongoObjectID> objectid = memnew(MongoObjectID(objectid_data));
             value = objectid;
 
             break;

@@ -8,7 +8,7 @@ func _init():
     print("connected")
 
     test_cursor()
-    list_accounts()
+    #list_accounts()
 
 func _idle(_delta):
     db.poll()
@@ -16,10 +16,20 @@ func _idle(_delta):
     return false
 
 func test_cursor():
+    var start = OS.get_ticks_msec()
     var dummy = db.get_database("test").get_collection("dummy")
     var result = dummy.find({})
     yield(result, "completed")
-    print("find: ", result.data.size())
+    var length = result.data.size()
+
+    while result.has_more_data():
+        result.next()
+        yield(result, "completed")
+        length += result.data.size()
+
+    var end = OS.get_ticks_msec()
+
+    print("Found ", length, " objects in ", (end-start), "ms")
 
 func list_accounts():
     var accounts = db.get_database("test").get_collection("test")
