@@ -6,7 +6,7 @@ QueryResult::QueryResult() {
     ERR_FAIL_MSG("Cannot instance QueryResult from script");
 }
 
-QueryResult::QueryResult(Ref<MongoDB> db, String collection_name) : m_db(db), m_full_collection_name(collection_name) {
+QueryResult::QueryResult(Ref<MongoDB> db, String collection_name, Dictionary filter) : m_db(db), m_full_collection_name(collection_name), m_filter(std::move(filter)) {
 
 }
 
@@ -17,8 +17,23 @@ QueryResult::~QueryResult() {
     }
 }
 
-void QueryResult::next() {
+bool QueryResult::next() {
+    if(m_request_id == 0) {
+        // Not yet requested, so send query to the server
+        m_db->execute_query(
+            m_full_collection_name,
+            0,
+            0,
+            m_filter,
+            this
+        );
+        return true;
+    }
+    
+    if(!has_more_data()) return false;
+
     m_db->get_more(this);
+    return true;
 }
 
 void QueryResult::_bind_methods() {

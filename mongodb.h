@@ -23,6 +23,9 @@ protected:
     void connect_database(String connection_uri);
     Ref<MongoDatabase> get_database(String name);
 
+    int get_default_cursor_size() { return m_cursor_size; }
+    void set_default_cursor_size(int cursor_size) { m_cursor_size = cursor_size; } 
+
     void poll();
 
 private:
@@ -35,6 +38,8 @@ private:
     String m_auth_database;
 
     int m_request_id = { 1 };
+
+    int m_cursor_size = { 1000 };
 
     Vector<uint8_t> m_packet;
     HashMap<int, Ref<QueryResult>> m_pending;

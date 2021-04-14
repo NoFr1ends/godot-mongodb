@@ -17,14 +17,15 @@ func _idle(_delta):
 
 func test_cursor():
     var start = OS.get_ticks_msec()
+
     var dummy = db.get_database("test").get_collection("dummy")
     var result = dummy.find({})
-    yield(result, "completed")
-    var length = result.data.size()
+    var length = 0
 
-    while result.has_more_data():
-        result.next()
+    while result.next():
         yield(result, "completed")
+
+        # do whatever you want with the page of data
         length += result.data.size()
 
     var end = OS.get_ticks_msec()

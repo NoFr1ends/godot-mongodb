@@ -177,7 +177,7 @@ void MongoDB::execute_query(String collection_name, int skip, int results, Dicti
 
     // Number to return
     MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
+    encode_uint32(m_cursor_size, &m_packet.write[position]);
     position += 4;
 
     // Query
@@ -229,7 +229,7 @@ void MongoDB::get_more(Ref<QueryResult> result) {
 
     // number to return (0 = server default)
     MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
+    encode_uint32(m_cursor_size, &m_packet.write[position]);
     position += 4;
 
     // Cursor ID
@@ -292,4 +292,8 @@ void MongoDB::_bind_methods() {
     ClassDB::bind_method(D_METHOD("poll"), &MongoDB::poll);
     ClassDB::bind_method(D_METHOD("connect_database", "connection_uri"), &MongoDB::connect_database);
     ClassDB::bind_method(D_METHOD("get_database", "name"), &MongoDB::get_database);
+    ClassDB::bind_method(D_METHOD("get_default_cursor_size"), &MongoDB::get_default_cursor_size);
+    ClassDB::bind_method(D_METHOD("set_default_cursor_size", "cursor_size"), &MongoDB::set_default_cursor_size);
+
+    ADD_PROPERTY(PropertyInfo(Variant::INT, "default_cursor_size"), "set_default_cursor_size", "get_default_cursor_size");
 }

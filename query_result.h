@@ -9,7 +9,7 @@ class QueryResult : public Reference {
 
 public:
     QueryResult();
-    QueryResult(Ref<MongoDB> db, String collection_name);
+    QueryResult(Ref<MongoDB> db, String collection_name, Dictionary filter);
     ~QueryResult();
 
     void set_request_id(int request_id) { m_request_id = request_id; }
@@ -27,12 +27,13 @@ public:
 
     bool has_more_data() { return m_cursor_id != 0; }
 
-    void next();
+    bool next();
 
 protected:
     static void _bind_methods();
 
 private:
+    Dictionary m_filter;
     int m_request_id = { 0 };
     int64_t m_cursor_id = { 0 };
     bool m_single_result = { false };

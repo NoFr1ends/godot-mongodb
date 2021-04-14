@@ -36,7 +36,7 @@ Variant MongoCollection::insert_one(Dictionary document) {
 }
 
 Variant MongoCollection::find_one(Dictionary filter) {
-    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, full_collection_name()));
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, full_collection_name(), filter));
     result->set_single_result(true);
 
     m_database->m_db->execute_query(
@@ -51,16 +51,7 @@ Variant MongoCollection::find_one(Dictionary filter) {
 }
 
 Variant MongoCollection::find(Dictionary filter) {
-    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, full_collection_name()));
-
-    m_database->m_db->execute_query(
-        full_collection_name(),
-        0,
-        0,
-        filter,
-        result
-    );
-
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, full_collection_name(), filter));
     return result;
 }
 
