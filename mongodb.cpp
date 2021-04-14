@@ -137,10 +137,8 @@ void MongoDB::poll() {
     }
 }
 
-void MongoDB::execute_query(String collection_name, int skip, int results, Dictionary &query, Ref<QueryResult> result) {
+int MongoDB::write_msg_header(int request_id, int opcode) {
     int position = 4;
-
-    auto request_id = m_request_id++;
 
     // Request ID
     MAKE_ROOM(position + 4);
@@ -154,8 +152,15 @@ void MongoDB::execute_query(String collection_name, int skip, int results, Dicti
 
     // OPCode
     MAKE_ROOM(position + 4);
-    encode_uint32(2004, &m_packet.write[position]);
+    encode_uint32(opcode, &m_packet.write[position]);
     position += 4;
+
+    return position;
+}
+
+void MongoDB::execute_query(String collection_name, int skip, int results, Dictionary &query, Ref<QueryResult> result) {
+    auto request_id = m_request_id++;
+    int position = write_msg_header(request_id, 2004);
 
     // TODO: Implement query flags
     // Flags
@@ -195,25 +200,42 @@ void MongoDB::execute_query(String collection_name, int skip, int results, Dicti
     m_tcp->put_data(m_packet.ptr(), position);
 }
 
-void MongoDB::get_more(Ref<QueryResult> result) {
-    int position = 4;
-
+void MongoDB::execute_update(String collection_name, int flags, Dictionary &selector, Dictionary &update) {
     auto request_id = m_request_id++;
+    int position = write_msg_header(request_id, 2001);
 
-    // Request ID
-    MAKE_ROOM(position + 4);
-    encode_uint32(request_id, &m_packet.write[position]);
-    position += 4;
-
-    // Response ID
+    // always zero - reserved for future use
     MAKE_ROOM(position + 4);
     encode_uint32(0, &m_packet.write[position]);
     position += 4;
 
-    // OPCode
+    // Collection Name
+    CharString collection = collection_name.utf8();
+    auto length = encode_cstring(collection.get_data(), nullptr);
+    MAKE_ROOM(position + length);
+    encode_cstring(collection.get_data(), &m_packet.write[position]);
+    position += length;
+
+    // Flags
     MAKE_ROOM(position + 4);
-    encode_uint32(2005, &m_packet.write[position]);
+    encode_uint32(flags, &m_packet.write[position]);
     position += 4;
+
+    // Selector / Query
+    position += Bson::serialize(selector, &m_packet, position);
+
+    // Update
+    position += Bson::serialize(update, &m_packet, position);
+
+    // Write length of final packet to the start
+    encode_uint32(position, &m_packet.write[0]);
+
+    m_tcp->put_data(m_packet.ptr(), position);
+}
+
+void MongoDB::get_more(Ref<QueryResult> result) {
+    auto request_id = m_request_id++;
+    int position = write_msg_header(request_id, 2005);
 
     // always zero
     MAKE_ROOM(position + 4);
@@ -248,24 +270,8 @@ void MongoDB::get_more(Ref<QueryResult> result) {
 }
 
 void MongoDB::free_cursor(int64_t cursor_id) {
-    int position = 4;
-
     auto request_id = m_request_id++;
-
-    // Request ID
-    MAKE_ROOM(position + 4);
-    encode_uint32(request_id, &m_packet.write[position]);
-    position += 4;
-
-    // Response ID
-    MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
-
-    // OPCode
-    MAKE_ROOM(position + 4);
-    encode_uint32(2007, &m_packet.write[position]);
-    position += 4;
+    int position = write_msg_header(request_id, 2007);
 
     // always zero
     MAKE_ROOM(position + 4);

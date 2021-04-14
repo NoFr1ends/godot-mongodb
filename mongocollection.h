@@ -24,8 +24,8 @@ protected:
 
     Variant find_one_and_update(Dictionary filter, Dictionary update);
 
-    bool update_one(Dictionary filter, Dictionary update);
-    bool update_many(Dictionary filter, Dictionary update);
+    void update_one(Dictionary filter, Dictionary update);
+    void update_many(Dictionary filter, Dictionary update);
 
     bool delete_one(Dictionary filter);
     bool delete_many(Dictionary filter);

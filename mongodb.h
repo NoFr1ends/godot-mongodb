@@ -13,7 +13,14 @@ class MongoDB : public Reference {
     GDCLASS(MongoDB, Reference);
 
 public:
+    enum UpdateFlags {
+        UPSERT = 1,
+        MULTI_UPDATE = 2
+    };
+
+public:
     void execute_query(String collection_name, int skip, int results, Dictionary &query, Ref<QueryResult> result);
+    void execute_update(String collection_name, int flags, Dictionary &selector, Dictionary &update);
     void get_more(Ref<QueryResult> result);
     void free_cursor(int64_t cursor_id);
 
@@ -27,6 +34,9 @@ protected:
     void set_default_cursor_size(int cursor_size) { m_cursor_size = cursor_size; } 
 
     void poll();
+
+private:
+    int write_msg_header(int request_id, int opcode);
 
 private:
     Ref<StreamPeerTCP> m_tcp;

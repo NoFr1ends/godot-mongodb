@@ -76,26 +76,22 @@ Variant MongoCollection::find_one_and_update(Dictionary filter, Dictionary updat
     return Variant();
 }
 
-bool MongoCollection::update_one(Dictionary filter, Dictionary update) {
-    /*try {
-        m_collection.update_one(convert_dictionary_to_document(filter), convert_dictionary_to_document(update));
-        return true;
-    } catch(mongocxx::exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
-    return false;
+void MongoCollection::update_one(Dictionary filter, Dictionary update) {
+    m_database->m_db->execute_update(
+        full_collection_name(),
+        0,
+        filter,
+        update
+    );
 }
 
-bool MongoCollection::update_many(Dictionary filter, Dictionary update) {
-    /*try {
-        m_collection.update_many(convert_dictionary_to_document(filter), convert_dictionary_to_document(update));
-        return true;
-    } catch(mongocxx::exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
-    return false;
+void MongoCollection::update_many(Dictionary filter, Dictionary update) {
+    m_database->m_db->execute_update(
+        full_collection_name(),
+        MongoDB::UpdateFlags::MULTI_UPDATE,
+        filter,
+        update
+    );
 }
 
 bool MongoCollection::delete_one(Dictionary filter) {

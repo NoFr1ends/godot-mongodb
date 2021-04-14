@@ -7,8 +7,9 @@ func _init():
     db.connect_database("mongodb://127.0.0.1")
     print("connected")
 
-    test_cursor()
+    #test_cursor()
     #list_accounts()
+    test_update()
 
 func _idle(_delta):
     db.poll()
@@ -45,3 +46,9 @@ func list_accounts():
     result = accounts.find_one({"test": 1337})
     yield(result, "completed")
     print("find_one: ", result.data)
+
+func test_update():
+    var accounts = db.get_database("test").get_collection("test")
+    accounts.update_one({"test": 4712}, {"$set": {"gd": "script"}})
+    
+    accounts.update_many({}, {"$set": {"time": OS.get_unix_time()}})
