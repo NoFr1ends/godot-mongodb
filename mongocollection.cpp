@@ -15,105 +15,130 @@ String MongoCollection::full_collection_name() {
 }
 
 Variant MongoCollection::insert_one(Dictionary document) {
-    /*try {
-        auto result = m_collection.insert_one(convert_dictionary_to_document(document));
-        if(result) {
-            auto inserted_id = result->inserted_id();
-            
-            Dictionary oid_dict;
-            auto oid = inserted_id.get_oid().value.to_string();
-            oid_dict["$oid"] = String(oid.c_str());
+    Dictionary request;
+    request["insert"] = m_collection;
+    request["$db"] = m_database->m_database;
 
-            return oid_dict;
-        } else {
-            return false;
-        }
-    } catch(mongocxx::operation_exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
-    return Variant();
+    Array documents;
+    documents.append(document);
+
+    request["documents"] = documents;
+
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
+    result->next();
+    return result;
 }
 
 Variant MongoCollection::find_one(Dictionary filter) {
-    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, full_collection_name(), filter));
+    Dictionary request;
+    request["find"] = m_collection;
+    request["filter"] = filter;
+    request["limit"] = 1;
+    request["singleBatch"] = true;
+    request["$db"] = m_database->m_database;
+
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
     result->set_single_result(true);
-
-    m_database->m_db->execute_query(
-        full_collection_name(),
-        0,
-        -1, /* close cursor automatically */
-        filter,
-        result
-    );
-
+    result->next();
     return result;
 }
 
 Variant MongoCollection::find(Dictionary filter) {
-    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, full_collection_name(), filter));
+    Dictionary request;
+    request["find"] = m_collection;
+    request["filter"] = filter;
+    request["batchSize"] = m_database->m_db->get_default_cursor_size();
+    request["$db"] = m_database->m_database;
+    
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
     return result;
 }
 
-Variant MongoCollection::find_one_and_update(Dictionary filter, Dictionary update) {
-    /*try {
-        mongocxx::options::find_one_and_update options;
-        options.return_document(mongocxx::options::return_document::k_after);
-        auto result = m_collection.find_one_and_update(
-            convert_dictionary_to_document(filter), 
-            convert_dictionary_to_document(update),
-            options
-        );
-        if(result) {
-            return convert_document_to_dictionary((*result).view());
-        } else {
-            return Variant();
-        }
-    } catch(mongocxx::exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
-    return Variant();
+Variant MongoCollection::find_one_and_update(Dictionary filter, Dictionary update, bool after) {
+    Dictionary request;
+    request["findAndModify"] = m_collection;
+    request["$db"] = m_database->m_database;
+    request["query"] = filter;
+    request["update"] = update;
+    request["new"] = after;
+
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
+    result->next();
+    return result;
 }
 
-void MongoCollection::update_one(Dictionary filter, Dictionary update) {
-    m_database->m_db->execute_update(
-        full_collection_name(),
-        0,
-        filter,
-        update
-    );
+Variant MongoCollection::update_one(Dictionary filter, Dictionary update) {
+    Dictionary request;
+    request["update"] = m_collection;
+    request["$db"] = m_database->m_database;
+
+    Array updates;
+    Dictionary update1 = Dictionary();
+    update1["q"] = filter;
+    update1["u"] = update;
+    update1["multi"] = false;
+    
+    updates.append(update1);
+    request["updates"] = updates;
+
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
+    result->next(); // execute
+    return result;
 }
 
-void MongoCollection::update_many(Dictionary filter, Dictionary update) {
-    m_database->m_db->execute_update(
-        full_collection_name(),
-        MongoDB::UpdateFlags::MULTI_UPDATE,
-        filter,
-        update
-    );
+Variant MongoCollection::update_many(Dictionary filter, Dictionary update) {
+    Dictionary request;
+    request["update"] = m_collection;
+    request["$db"] = m_database->m_database;
+
+    Array updates;
+    Dictionary update1 = Dictionary();
+    update1["q"] = filter;
+    update1["u"] = update;
+    update1["multi"] = true;
+    
+    updates.append(update1);
+    request["updates"] = updates;
+
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
+    result->next(); // execute
+    return result;
 }
 
-bool MongoCollection::delete_one(Dictionary filter) {
-    /*try {
-        m_collection.delete_one(convert_dictionary_to_document(filter));
-        return true;
-    } catch(mongocxx::exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
-    return false;
+Variant MongoCollection::delete_one(Dictionary filter) {
+    Dictionary request;
+    request["delete"] = m_collection;
+    request["$db"] = m_database->m_database;
+
+    Array deletes;
+    Dictionary delete1 = Dictionary();
+    delete1["q"] = filter;
+    delete1["limit"] = 1;
+    
+    deletes.append(delete1);
+    request["deletes"] = deletes;
+
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
+    result->next(); // execute
+    return result;
 }
 
-bool MongoCollection::delete_many(Dictionary filter) {
-    /*try {
-        m_collection.delete_many(convert_dictionary_to_document(filter));
-        return true;
-    } catch(mongocxx::exception &e) {
-        ERR_PRINT(e.what());
-        return false;
-    }*/
-    return false;
+Variant MongoCollection::delete_many(Dictionary filter) {
+    Dictionary request;
+    request["delete"] = m_collection;
+    request["$db"] = m_database->m_database;
+
+    Array deletes;
+    Dictionary delete1 = Dictionary();
+    delete1["q"] = filter;
+    delete1["limit"] = 1;
+    
+    deletes.append(delete1);
+    request["deletes"] = deletes;
+
+    Ref<QueryResult> result = memnew(QueryResult(m_database->m_db, request));
+    result->next(); // execute
+    return result;
 }
 
 void MongoCollection::_bind_methods() {

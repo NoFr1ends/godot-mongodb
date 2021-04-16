@@ -23,6 +23,10 @@ public:
     void execute_update(String collection_name, int flags, Dictionary &selector, Dictionary &update);
     void get_more(Ref<QueryResult> result);
     void free_cursor(int64_t cursor_id);
+    void execute_msg(Ref<QueryResult> result, Dictionary document, int flags);
+
+    int get_default_cursor_size() { return m_cursor_size; }
+    void set_default_cursor_size(int cursor_size) { m_cursor_size = cursor_size; } 
 
 protected:
     static void _bind_methods();
@@ -30,13 +34,12 @@ protected:
     void connect_database(String connection_uri);
     Ref<MongoDatabase> get_database(String name);
 
-    int get_default_cursor_size() { return m_cursor_size; }
-    void set_default_cursor_size(int cursor_size) { m_cursor_size = cursor_size; } 
-
     void poll();
 
 private:
     int write_msg_header(int request_id, int opcode);
+    void parse_reply(int32_t length, int32_t response_to);
+    void parse_msg(int32_t length, int32_t response_to);
 
 private:
     Ref<StreamPeerTCP> m_tcp;

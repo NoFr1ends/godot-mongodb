@@ -68,35 +68,15 @@ Ref<MongoDatabase> MongoDB::get_database(String name) {
 #define MAKE_ROOM(m_amount) \
 	if (m_packet.size() < m_amount) m_packet.resize(m_amount)
 
-void MongoDB::poll() {
-    if(!m_tcp.is_valid()) {
-        ERR_FAIL_MSG("connection not valid")
-        return;
-    }
-    if(m_tcp->get_status() != StreamPeerTCP::STATUS_CONNECTED) {
-        ERR_FAIL_MSG("not connected (" + itos(m_tcp->get_status()) + ")")
-        return;
-    }
+constexpr int32_t message_header_size = 4 + 4 + 4 + 4;
 
-    // Check if we have length data
-    if(m_tcp->get_available_bytes() < 4) return;
-
-    auto length = m_tcp->get_32();
-    auto request_id = m_tcp->get_32();
-    auto response_to = m_tcp->get_32();
-    auto opcode = m_tcp->get_32();
-
-    if(opcode != 1) {
-        WARN_PRINT("Invalid response from server");
-        return;
-    }
-
+void MongoDB::parse_reply(int32_t length, int32_t response_to) {
     auto response_flags = m_tcp->get_32();
     auto cursor_id = m_tcp->get_64();
     auto starting_from = m_tcp->get_32();
     auto returned = m_tcp->get_32();
 
-    auto documents_length = length - 4 - 4 - 4 - 4 - 4 - 8 - 4 - 4;
+    auto documents_length = length - message_header_size - 4 - 8 - 4 - 4;
 
     MAKE_ROOM(documents_length);
     auto status = m_tcp->get_data(&m_packet.write[0], documents_length);
@@ -134,6 +114,53 @@ void MongoDB::poll() {
         
         result->emit_signal("completed");
         m_pending.erase(response_to);
+    }
+}
+
+void MongoDB::parse_msg(int32_t length, int32_t response_to) {
+    auto flags = m_tcp->get_32();
+
+    auto section = m_tcp->get_8();
+    ERR_FAIL_COND_MSG(section != 0, "Currently only body sections supported");
+
+    auto reply_length = length - message_header_size - 4 - 1;
+    MAKE_ROOM(reply_length);
+    auto status = m_tcp->get_data(&m_packet.write[0], reply_length);
+    if(status != OK) {
+        WARN_PRINT("Failed to read data (" + itos(status) + ")")
+    }
+
+    Dictionary reply;
+    Bson::deserialize(&m_packet, reply, 0);
+    
+    auto result = m_pending[response_to];
+    result->process_msg(reply);
+}
+
+void MongoDB::poll() {
+    if(!m_tcp.is_valid()) {
+        ERR_FAIL_MSG("connection not valid")
+        return;
+    }
+    if(m_tcp->get_status() != StreamPeerTCP::STATUS_CONNECTED) {
+        ERR_FAIL_MSG("not connected (" + itos(m_tcp->get_status()) + ")")
+        return;
+    }
+
+    // Check if we have length data
+    if(m_tcp->get_available_bytes() < 4) return;
+
+    auto length = m_tcp->get_32();
+    auto request_id = m_tcp->get_32();
+    auto response_to = m_tcp->get_32();
+    auto opcode = m_tcp->get_32();
+
+    if(opcode == 1) {
+        parse_reply(length, response_to);
+    } else if(opcode == 2013) {
+        parse_msg(length, response_to);
+    } else {
+        WARN_PRINT("Invalid response from server");
     }
 }
 
@@ -234,7 +261,7 @@ void MongoDB::execute_update(String collection_name, int flags, Dictionary &sele
 }
 
 void MongoDB::get_more(Ref<QueryResult> result) {
-    auto request_id = m_request_id++;
+    /*auto request_id = m_request_id++;
     int position = write_msg_header(request_id, 2005);
 
     // always zero
@@ -266,7 +293,7 @@ void MongoDB::get_more(Ref<QueryResult> result) {
 
     m_pending.set({ request_id, result });
 
-    m_tcp->put_data(m_packet.ptr(), position);
+    m_tcp->put_data(m_packet.ptr(), position);*/
 }
 
 void MongoDB::free_cursor(int64_t cursor_id) {
@@ -290,6 +317,33 @@ void MongoDB::free_cursor(int64_t cursor_id) {
 
     // length
     encode_uint32(position, &m_packet.write[0]);
+
+    m_tcp->put_data(m_packet.ptr(), position);
+}
+
+void MongoDB::execute_msg(Ref<QueryResult> result, Dictionary document, int flags) {
+    auto request_id = m_request_id++;
+    int position = write_msg_header(request_id, 2013);
+
+    // Flags
+    MAKE_ROOM(position + 4);
+    encode_uint32(flags, &m_packet.write[position]);
+    position += 4;
+
+    // Kind of section
+    MAKE_ROOM(position + 1);
+    m_packet.write[position] = 0;
+    position += 1;
+
+    // Query / Document
+    position += Bson::serialize(document, &m_packet, position);
+
+    // Length
+    encode_uint32(position, &m_packet.write[0]);
+
+    // Set query id to query result
+    result->set_request_id(request_id);
+    m_pending.set({ request_id, result });
 
     m_tcp->put_data(m_packet.ptr(), position);
 }

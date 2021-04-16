@@ -22,13 +22,13 @@ protected:
     Variant find_one(Dictionary filter);
     Variant find(Dictionary filter);
 
-    Variant find_one_and_update(Dictionary filter, Dictionary update);
+    Variant find_one_and_update(Dictionary filter, Dictionary update, bool after = false);
 
-    void update_one(Dictionary filter, Dictionary update);
-    void update_many(Dictionary filter, Dictionary update);
+    Variant update_one(Dictionary filter, Dictionary update);
+    Variant update_many(Dictionary filter, Dictionary update);
 
-    bool delete_one(Dictionary filter);
-    bool delete_many(Dictionary filter);
+    Variant delete_one(Dictionary filter);
+    Variant delete_many(Dictionary filter);
 
 private:
     Ref<MongoDatabase> m_database;

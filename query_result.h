@@ -9,15 +9,13 @@ class QueryResult : public Reference {
 
 public:
     QueryResult();
-    QueryResult(Ref<MongoDB> db, String collection_name, Dictionary filter);
+    QueryResult(Ref<MongoDB> db, Dictionary request);
     ~QueryResult();
 
     void set_request_id(int request_id) { m_request_id = request_id; }
 
     int64_t get_cursor_id() { return m_cursor_id; }
     void set_cursor_id(int64_t cursor_id) { m_cursor_id = cursor_id; }
-
-    String get_collection_name() { return m_full_collection_name; }
 
     void assign_result(Variant result) { m_result = result; }
     Variant get_result() { return m_result; }
@@ -29,15 +27,16 @@ public:
 
     bool next();
 
+    void process_msg(Dictionary &reply);
+
 protected:
     static void _bind_methods();
 
 private:
-    Dictionary m_filter;
+    Dictionary m_request;
     int m_request_id = { 0 };
     int64_t m_cursor_id = { 0 };
     bool m_single_result = { false };
-    String m_full_collection_name;
     Variant m_result;
 
     Ref<MongoDB> m_db;
