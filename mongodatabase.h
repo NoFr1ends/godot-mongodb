@@ -4,6 +4,7 @@
 #include "core/reference.h"
 
 #include "mongodb.h"
+#include "query_result.h"
 
 class MongoCollection;
 
@@ -18,7 +19,7 @@ public:
 protected:
     static void _bind_methods();
 
-    Variant run_command(Dictionary command);
+    Ref<QueryResult> connection_status();
     Ref<MongoCollection> get_collection(String name);
 
 private:

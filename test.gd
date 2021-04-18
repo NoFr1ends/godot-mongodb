@@ -1,13 +1,13 @@
-extends MainLoop
+extends SceneTree
 
 var db: MongoDB = null
 
 func _init():
     db = MongoDB.new()
-    db.connect_database("mongodb://127.0.0.1")
+    db.connect_database("mongodb://test:test123@127.0.0.1?authSource=admin")
     print("connected")
 
-    db.auth("test", "test123", "admin");
+    #db.auth("test", "test123", "admin");
 
     #test_cursor()
     #list_accounts()

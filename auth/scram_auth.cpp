@@ -160,8 +160,8 @@ void ScramAuth::process_msg(Dictionary &reply) {
     PoolByteArray salt_buffer = base64_raw(salt);
     auto salt_reader = salt_buffer.read();
 
-    print_line("SCRAM reply: ");
-    print_line((Variant)arguments);
+    print_verbose("SCRAM reply: ");
+    print_verbose((Variant)arguments);
 
     String pwd = m_password; //password_digest();
     CharString pwd_ascii = pwd.ascii();

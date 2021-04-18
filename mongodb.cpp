@@ -45,6 +45,19 @@ void MongoDB::connect_database(String connection_uri) {
     m_username = match->get_string("username");
     m_password = match->get_string("password");
 
+    // Parse options
+    auto options_str = match->get_string("options");
+    Dictionary options;
+    if(!options_str.empty()) {
+        options_str = options_str.substr(1); // remove question mark
+        auto option_list = options_str.split("&");
+        for(int i = 0; i < option_list.size(); i++) {
+            auto option = option_list[i].split("=", true, 1);
+            options[option[0]] = option.size() > 1 ? (Variant)option[1] : (Variant)true;
+        }
+    }
+    print_line((Variant)options);
+
     // Check if we already have a tcp client
     if(m_tcp.is_valid()) {
         // Disconnect from the old connection
@@ -57,6 +70,15 @@ void MongoDB::connect_database(String connection_uri) {
     // Connect to database host
     auto status = m_tcp->connect_to_host(resolveHost(m_host), 27017); // TODO: implement port
     ERR_FAIL_COND_MSG(status == FAILED, "Failed to connect to database")
+
+    // Check if we have auth details in the connection string
+    if(!m_username.empty() && !m_password.empty()) {
+        String auth_database = m_database;
+        if(options.has("authSource")) auth_database = options["authSource"];
+
+        if(auth_database.empty()) auth_database = "admin";
+        auth(m_username, m_password, auth_database);
+    }
 }
 
 void MongoDB::auth(String username, String password, String auth_database) {
