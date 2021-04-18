@@ -56,7 +56,6 @@ void MongoDB::connect_database(String connection_uri) {
             options[option[0]] = option.size() > 1 ? (Variant)option[1] : (Variant)true;
         }
     }
-    print_line((Variant)options);
 
     // Check if we already have a tcp client
     if(m_tcp.is_valid()) {

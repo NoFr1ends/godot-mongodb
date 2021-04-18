@@ -6,6 +6,8 @@
 #include <mbedtls/md.h>
 #include <mbedtls/pkcs5.h>
 
+//#define SCRAM_DEBUG
+
 void ScramAuth::prepare(String username, String password, String database) {
     // Temporarly store connection details
     m_username = username;
@@ -190,8 +192,10 @@ void ScramAuth::process_msg(Dictionary &reply) {
     PoolByteArray salt_buffer = base64_raw(salt);
     auto salt_reader = salt_buffer.read();
 
+#ifdef SCRAM_DEBUG
     print_verbose("SCRAM reply: ");
     print_verbose((Variant)arguments);
+#endif
 
     String pwd = m_password; //password_digest();
     CharString pwd_ascii = pwd.ascii();
@@ -211,28 +215,38 @@ void ScramAuth::process_msg(Dictionary &reply) {
     auto status = mbedtls_pkcs5_pbkdf2_hmac(&ctx, reinterpret_cast<const unsigned char*>(pwd_ascii.ptr()), pwd_ascii.size(), salt_reader.ptr(), salt_buffer.size(), iterations, 32, salted_data_writer.ptr());
     ERR_FAIL_COND_MSG(status != 0, "Failed to PBKDF2: " + itos(status));
 
+#ifdef SCRAM_DEBUG
     print_verbose(pwd);
     print_verbose(salt);
     print_verbose(CryptoCore::b64_encode_str(salted_data.read().ptr(), salted_data.size()));
+#endif
 
     // generate client and server key
     auto client_key = hmac(&ctx, salted_data, "Client Key");
     auto server_key = hmac(&ctx, salted_data, "Server Key");
     auto stored_key = hash(&ctx, client_key);
+#ifdef SCRAM_DEBUG
     print_verbose(CryptoCore::b64_encode_str(client_key.read().ptr(), client_key.size()));
     print_verbose(CryptoCore::b64_encode_str(server_key.read().ptr(), server_key.size()));
     print_verbose(CryptoCore::b64_encode_str(stored_key.read().ptr(), stored_key.size()));
+#endif
 
     String auth_message = first_message() + "," + payload + "," + without_proof;
     auto client_signature = hmac(&ctx, stored_key, auth_message);
+#ifdef SCRAM_DEBUG
     print_verbose(CryptoCore::b64_encode_str(client_signature.read().ptr(), client_signature.size()));
+#endif
 
     auto client_proof = "p=" + xor_buffer(client_key, client_signature);
+#ifdef SCRAM_DEBUG
     print_verbose(client_proof);
+#endif
     auto final = without_proof + "," + client_proof;
 
     m_server_signature = hmac(&ctx, server_key, auth_message);
+#ifdef SCRAM_DEBUG
     print_verbose(CryptoCore::b64_encode_str(m_server_signature.read().ptr(), m_server_signature.size()));
+#endif
 
     CharString utf8 = final.utf8();
     PoolByteArray final_buffer;
