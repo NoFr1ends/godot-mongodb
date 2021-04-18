@@ -1,5 +1,7 @@
 #SCsub
 Import('env')
 
+env.Append(CPPPATH=["#thirdparty/mbedtls/include/"])
+
 env.add_source_files(env.modules_sources,"*.cpp")
 env.add_source_files(env.modules_sources,"auth/*.cpp")
