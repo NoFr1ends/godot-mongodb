@@ -119,6 +119,38 @@ String xor_buffer(PoolByteArray a, PoolByteArray b) {
     return CryptoCore::b64_encode_str(c.read().ptr(), c.size());
 }
 
+bool compare_digest(PoolByteArray expected, PoolByteArray actual) {
+    if(expected.size() != actual.size()) return false;
+    int result = 0;
+    for(int i = 0; i < expected.size(); i++) {
+        result |= expected[i] ^ actual[i];
+    }
+
+    return result == 0;
+}
+
+Dictionary parse_response(String payload) {
+    // Parse reply
+    auto arguments_list = payload.split(",");
+    Dictionary arguments;
+    for(int i = 0; i < arguments_list.size(); i++) {
+        auto a = arguments_list[i].split("=", true, 1);
+        ERR_CONTINUE_MSG(a.size() != 2, "Failed to parse SCRAM payload: " + arguments_list[i]);
+        arguments[a[0]] = a[1];
+    }
+
+    return arguments;
+}
+
+Dictionary parse_response(PoolByteArray payload_buffer) {
+    String payload;
+    PoolByteArray::Read r = payload_buffer.read();
+    payload.parse_utf8((const char *)r.ptr(), payload_buffer.size());
+    r.release();
+
+    return parse_response(payload);
+}
+
 void ScramAuth::process_msg(Dictionary &reply) {
     if((int)reply["ok"] != 1) {
         // auth failed
@@ -127,7 +159,13 @@ void ScramAuth::process_msg(Dictionary &reply) {
 
     // Check if we're done
     if((bool)reply["done"]) {
-        // TODO: check server signature!
+        Dictionary arguments = parse_response((PoolByteArray)reply["payload"]);
+        PoolByteArray verify = base64_raw(arguments["v"]);
+
+        if(!compare_digest(m_server_signature, verify)) {
+            print_line("Verify of SCRAM reply failed, authentication failed");
+            return;
+        }
 
         // auth done
         print_line("authentication done");
@@ -140,15 +178,7 @@ void ScramAuth::process_msg(Dictionary &reply) {
     PoolByteArray::Read r = payload_buffer.read();
     payload.parse_utf8((const char *)r.ptr(), payload_buffer.size());
     r.release();
-
-    // Parse reply
-    auto arguments_list = payload.split(",");
-    Dictionary arguments;
-    for(int i = 0; i < arguments_list.size(); i++) {
-        auto a = arguments_list[i].split("=", true, 1);
-        ERR_CONTINUE_MSG(a.size() != 2, "Failed to parse SCRAM payload: " + arguments_list[i]);
-        arguments[a[0]] = a[1];
-    }
+    Dictionary arguments = parse_response(payload_buffer);
 
     int iterations = ((String)arguments["i"]).to_int();
     if(iterations && iterations < 4096) {
@@ -201,7 +231,7 @@ void ScramAuth::process_msg(Dictionary &reply) {
     print_verbose(client_proof);
     auto final = without_proof + "," + client_proof;
 
-    m_server_signature = hmac(&ctx, server_key, auth_message); // TODO: store that to compare on reply
+    m_server_signature = hmac(&ctx, server_key, auth_message);
     print_verbose(CryptoCore::b64_encode_str(m_server_signature.read().ptr(), m_server_signature.size()));
 
     CharString utf8 = final.utf8();
