@@ -2,17 +2,19 @@
 
 #include "core/reference.h"
 
+#include "reply_listener.h"
+
 class MongoDB;
 
-class QueryResult : public Reference {
-    GDCLASS(QueryResult, Reference);
+class QueryResult : public ReplyListener {
+    GDCLASS(QueryResult, ReplyListener);
 
 public:
     QueryResult();
     QueryResult(Ref<MongoDB> db, Dictionary request);
     ~QueryResult();
 
-    void set_request_id(int request_id) { m_request_id = request_id; }
+    void set_request_id(int request_id) override { m_request_id = request_id; }
 
     int64_t get_cursor_id() { return m_cursor_id; }
     void set_cursor_id(int64_t cursor_id) { m_cursor_id = cursor_id; }
@@ -27,7 +29,7 @@ public:
 
     bool next();
 
-    void process_msg(Dictionary &reply);
+    void process_msg(Dictionary &reply) override;
 
 protected:
     static void _bind_methods();

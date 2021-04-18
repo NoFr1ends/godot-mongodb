@@ -245,7 +245,18 @@ Variant deserialize_value(uint8_t type, Vector<uint8_t> *data, int *position) {
         case 0x05: // binary 
         {
             auto length = decode_uint32(data->ptr() + *position);
-            *position += 4 + length;
+            *position += 4;
+            auto subtype = data->ptr() + *position; // TODO: Implement subtypes
+            *position += 1;
+
+            PoolByteArray buffer;
+            buffer.resize(length);
+            auto w = buffer.write();
+            copymem(w.ptr(), data->ptr() + *position, length);
+            w.release();
+            value = buffer;
+
+            *position += length;
             break;
         }
         case 0x06: // undefined
@@ -321,7 +332,7 @@ Variant deserialize_value(uint8_t type, Vector<uint8_t> *data, int *position) {
             break;
         }
         default: {
-            ERR_FAIL_V_MSG(0, "Unknown bson type " + itos(type));
+            ERR_FAIL_V_MSG(0, "Unknown bson type " + itos(type) + " (pos: " + itos(*position) + ")");
             break;
         }
     }

@@ -7,12 +7,14 @@ func _init():
     db.connect_database("mongodb://127.0.0.1")
     print("connected")
 
+    db.auth("test", "test123", "admin");
+
     #test_cursor()
     #list_accounts()
     #test_update()
     #test_delete()
     #test_insert()
-    test_find_and_update()
+    #test_find_and_update()
 
 func _idle(_delta):
     db.poll()

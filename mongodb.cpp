@@ -6,6 +6,7 @@
 #include "mongodatabase.h"
 #include "query_result.h"
 #include "bson.h"
+#include "auth/scram_auth.h"
 
 MongoDB::MongoDB() {
 
@@ -58,6 +59,13 @@ void MongoDB::connect_database(String connection_uri) {
     ERR_FAIL_COND_MSG(status == FAILED, "Failed to connect to database")
 }
 
+void MongoDB::auth(String username, String password, String auth_database) {
+    // FIXME: check which authentication mechanism should be used and is supported by the server
+    Ref<ScramAuth> auth = memnew(ScramAuth());
+    auth->prepare(username, password, auth_database);
+    auth->auth(this);
+}
+
 Ref<MongoDatabase> MongoDB::get_database(String name) {
     Ref<MongoDatabase> database;
     database.instance();
@@ -69,53 +77,6 @@ Ref<MongoDatabase> MongoDB::get_database(String name) {
 	if (m_packet.size() < m_amount) m_packet.resize(m_amount)
 
 constexpr int32_t message_header_size = 4 + 4 + 4 + 4;
-
-void MongoDB::parse_reply(int32_t length, int32_t response_to) {
-    auto response_flags = m_tcp->get_32();
-    auto cursor_id = m_tcp->get_64();
-    auto starting_from = m_tcp->get_32();
-    auto returned = m_tcp->get_32();
-
-    auto documents_length = length - message_header_size - 4 - 8 - 4 - 4;
-
-    MAKE_ROOM(documents_length);
-    auto status = m_tcp->get_data(&m_packet.write[0], documents_length);
-    if(status != OK) {
-        WARN_PRINT("Failed to read data (" + itos(status) + ")")
-    }
-
-    if(!m_pending.has(response_to)) {
-        WARN_PRINT("Received response for unknown query")
-    } else {
-        auto result = m_pending[response_to];
-        result->set_cursor_id(cursor_id);
-
-        auto single_result = result->get_single_result();
-
-        int position = 0;
-
-        if(!single_result) {
-            Array documents;
-            for(int i = 0; i < returned; i++) {
-                Dictionary document;
-                position = Bson::deserialize(&m_packet, document, position);
-                documents.append(document);
-            }
-            result->assign_result(documents);
-        } else {
-            if(returned > 0) {
-                Dictionary document;
-                Bson::deserialize(&m_packet, document, position);
-                result->assign_result(document);
-            } else {
-                result->assign_result(Variant()); // set result to null
-            }
-        }
-        
-        result->emit_signal("completed");
-        m_pending.erase(response_to);
-    }
-}
 
 void MongoDB::parse_msg(int32_t length, int32_t response_to) {
     auto flags = m_tcp->get_32();
@@ -156,7 +117,7 @@ void MongoDB::poll() {
     auto opcode = m_tcp->get_32();
 
     if(opcode == 1) {
-        parse_reply(length, response_to);
+        ERR_FAIL_MSG("Received old reply type which is unsupported");
     } else if(opcode == 2013) {
         parse_msg(length, response_to);
     } else {
@@ -185,117 +146,6 @@ int MongoDB::write_msg_header(int request_id, int opcode) {
     return position;
 }
 
-void MongoDB::execute_query(String collection_name, int skip, int results, Dictionary &query, Ref<QueryResult> result) {
-    auto request_id = m_request_id++;
-    int position = write_msg_header(request_id, 2004);
-
-    // TODO: Implement query flags
-    // Flags
-    MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
-
-    // Collection Name
-    CharString collection = collection_name.utf8();
-    auto length = encode_cstring(collection.get_data(), nullptr);
-    MAKE_ROOM(position + length);
-    encode_cstring(collection.get_data(), &m_packet.write[position]);
-    position += length;
-
-    // Number to skip
-    MAKE_ROOM(position + 4);
-    encode_uint32(skip, &m_packet.write[position]);
-    position += 4;
-
-    // Number to return
-    MAKE_ROOM(position + 4);
-    encode_uint32(m_cursor_size, &m_packet.write[position]);
-    position += 4;
-
-    // Query
-    position += Bson::serialize(query, &m_packet, position);
-
-    // Write length of final packet to the start
-    encode_uint32(position, &m_packet.write[0]);
-
-    // Set query id to query result
-    result->set_request_id(request_id);
-
-    m_pending.set({ request_id, result });
-
-    // Send query to server
-    m_tcp->put_data(m_packet.ptr(), position);
-}
-
-void MongoDB::execute_update(String collection_name, int flags, Dictionary &selector, Dictionary &update) {
-    auto request_id = m_request_id++;
-    int position = write_msg_header(request_id, 2001);
-
-    // always zero - reserved for future use
-    MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
-
-    // Collection Name
-    CharString collection = collection_name.utf8();
-    auto length = encode_cstring(collection.get_data(), nullptr);
-    MAKE_ROOM(position + length);
-    encode_cstring(collection.get_data(), &m_packet.write[position]);
-    position += length;
-
-    // Flags
-    MAKE_ROOM(position + 4);
-    encode_uint32(flags, &m_packet.write[position]);
-    position += 4;
-
-    // Selector / Query
-    position += Bson::serialize(selector, &m_packet, position);
-
-    // Update
-    position += Bson::serialize(update, &m_packet, position);
-
-    // Write length of final packet to the start
-    encode_uint32(position, &m_packet.write[0]);
-
-    m_tcp->put_data(m_packet.ptr(), position);
-}
-
-void MongoDB::get_more(Ref<QueryResult> result) {
-    /*auto request_id = m_request_id++;
-    int position = write_msg_header(request_id, 2005);
-
-    // always zero
-    MAKE_ROOM(position + 4);
-    encode_uint32(0, &m_packet.write[position]);
-    position += 4;
-
-    // Collection Name
-    CharString collection = result->get_collection_name().utf8();
-    auto length = encode_cstring(collection.get_data(), nullptr);
-    MAKE_ROOM(position + length);
-    encode_cstring(collection.get_data(), &m_packet.write[position]);
-    position += length;
-
-    // number to return (0 = server default)
-    MAKE_ROOM(position + 4);
-    encode_uint32(m_cursor_size, &m_packet.write[position]);
-    position += 4;
-
-    // Cursor ID
-    MAKE_ROOM(position + 8);
-    encode_uint64(result->get_cursor_id(), &m_packet.write[position]);
-    position += 8;
-
-    // length
-    encode_uint32(position, &m_packet.write[0]);
-
-    result->set_request_id(request_id);
-
-    m_pending.set({ request_id, result });
-
-    m_tcp->put_data(m_packet.ptr(), position);*/
-}
-
 void MongoDB::free_cursor(int64_t cursor_id) {
     auto request_id = m_request_id++;
     int position = write_msg_header(request_id, 2007);
@@ -321,7 +171,7 @@ void MongoDB::free_cursor(int64_t cursor_id) {
     m_tcp->put_data(m_packet.ptr(), position);
 }
 
-void MongoDB::execute_msg(Ref<QueryResult> result, Dictionary document, int flags) {
+void MongoDB::execute_msg(Ref<ReplyListener> result, Dictionary document, int flags) {
     auto request_id = m_request_id++;
     int position = write_msg_header(request_id, 2013);
 
@@ -342,13 +192,16 @@ void MongoDB::execute_msg(Ref<QueryResult> result, Dictionary document, int flag
     encode_uint32(position, &m_packet.write[0]);
 
     // Set query id to query result
-    result->set_request_id(request_id);
-    m_pending.set({ request_id, result });
+    if(result.is_valid()) {
+        result->set_request_id(request_id);
+        m_pending.set({ request_id, result });
+    }
 
     m_tcp->put_data(m_packet.ptr(), position);
 }
 
 void MongoDB::_bind_methods() {
+    ClassDB::bind_method(D_METHOD("auth", "username", "password", "auth_database"), &MongoDB::auth);
     ClassDB::bind_method(D_METHOD("poll"), &MongoDB::poll);
     ClassDB::bind_method(D_METHOD("connect_database", "connection_uri"), &MongoDB::connect_database);
     ClassDB::bind_method(D_METHOD("get_database", "name"), &MongoDB::get_database);

@@ -5,7 +5,7 @@
 #include "core/hash_map.h"
 #include "core/io/stream_peer_tcp.h"
 
-#include "query_result.h"
+#include "reply_listener.h"
 
 class MongoDatabase;
 
@@ -19,11 +19,10 @@ public:
     };
 
 public:
-    void execute_query(String collection_name, int skip, int results, Dictionary &query, Ref<QueryResult> result);
-    void execute_update(String collection_name, int flags, Dictionary &selector, Dictionary &update);
-    void get_more(Ref<QueryResult> result);
+    void auth(String username, String password, String auth_database);
+
     void free_cursor(int64_t cursor_id);
-    void execute_msg(Ref<QueryResult> result, Dictionary document, int flags);
+    void execute_msg(Ref<ReplyListener> result, Dictionary document, int flags);
 
     int get_default_cursor_size() { return m_cursor_size; }
     void set_default_cursor_size(int cursor_size) { m_cursor_size = cursor_size; } 
@@ -38,7 +37,6 @@ protected:
 
 private:
     int write_msg_header(int request_id, int opcode);
-    void parse_reply(int32_t length, int32_t response_to);
     void parse_msg(int32_t length, int32_t response_to);
 
 private:
@@ -55,7 +53,7 @@ private:
     int m_cursor_size = { 1000 };
 
     Vector<uint8_t> m_packet;
-    HashMap<int, Ref<QueryResult>> m_pending;
+    HashMap<int, Ref<ReplyListener>> m_pending;
 
 public:
     MongoDB();
