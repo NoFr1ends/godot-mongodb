@@ -104,6 +104,23 @@ int serialize_variant(String key, Variant value, Vector<uint8_t> *data, int posi
         }
         // 0x06 undefined - deprecated
         // TODO:: 0x07 ObjectID
+        case Variant::OBJECT:
+        {
+            Object* obj = value;
+            if(obj->is_class_ptr(MongoObjectID::get_class_ptr_static())) {
+                auto id = dynamic_cast<MongoObjectID*>(obj);
+                WRITE_TYPE(0x07);
+                WRITE_FIELD(key);
+
+                MAKE_ROOM(position + 12);
+                copymem(&data->write[position], id->get_data(), 12);
+                position += 12;
+                break;
+            } else {
+                ERR_BREAK_MSG(true, "Unsupported variant type to bson " + Variant::get_type_name(value.get_type()));
+            }
+            
+        }
         case Variant::BOOL: 
         {
             WRITE_TYPE(0x08);

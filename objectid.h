@@ -14,6 +14,8 @@ public:
 
     uint8_t *get_data() { return m_data; }
 
+    String str();
+    void from_string(String str);
     String to_string() override;
     
 private:
