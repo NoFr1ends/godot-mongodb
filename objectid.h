@@ -17,7 +17,12 @@ public:
     String str();
     void from_string(String str);
     String to_string() override;
+
+    static void initialize();
     
 private:
     uint8_t *m_data;
+
+    static uint32_t m_counter;
+    static RandomPCG m_random;
 };

@@ -7,6 +7,13 @@ func _init():
     db.connect_database("mongodb://test:test123@127.0.0.1?authSource=admin")
     print("connected")
 
+    var id = MongoObjectID.new()
+    print(id)
+    id = MongoObjectID.new()
+    print(id)
+    id = MongoObjectID.new()
+    print(id)
+
     #db.auth("test", "test123", "admin");
 
     #test_cursor()

@@ -2,6 +2,7 @@
 
 #include "mongodatabase.h"
 #include "query_result.h"
+#include "objectid.h"
 
 MongoCollection::MongoCollection() {}
 
@@ -18,6 +19,11 @@ Variant MongoCollection::insert_one(Dictionary document) {
     Dictionary request;
     request["insert"] = m_collection;
     request["$db"] = m_database->m_database;
+
+    if(!document.has("_id")) {
+        Ref<MongoObjectID> id = memnew(MongoObjectID());
+        document["_id"] = id;
+    }
 
     Array documents;
     documents.append(document);

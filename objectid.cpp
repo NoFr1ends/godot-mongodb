@@ -1,7 +1,36 @@
 #include "objectid.h"
 
+#include "core/os/os.h"
+#include "core/io/marshalls.h"
+
+uint32_t MongoObjectID::m_counter = 0;
+RandomPCG MongoObjectID::m_random;
+
+void MongoObjectID::initialize() {
+    m_random.randomize();
+    m_counter = m_random.rand();
+}
+
 MongoObjectID::MongoObjectID() {
     m_data = new uint8_t[12] { };
+
+    // NOTE: timestamp is 4 byte by mongodb definition
+    auto timestamp = OS::get_singleton()->get_unix_time();
+    uint64_t random = m_random.rand() << 32 | m_random.rand();
+    auto counter = m_counter++;
+    // timestamp and counter are big endian
+    timestamp = BSWAP32(timestamp);
+    counter = BSWAP32(counter) >> 8; // counter is only 3 byte long
+
+    encode_uint32(timestamp, &m_data[0]);
+    for (int i = 0; i < 5; i++) {
+		m_data[4+i] = random & 0xFF;
+		random >>= 8;
+	}
+    for (int i = 0; i < 3; i++) {
+		m_data[4+5+i] = counter & 0xFF;
+		counter >>= 8;
+	}
 }
 
 MongoObjectID::~MongoObjectID() {
